@@ -1,64 +1,64 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { CarRentalSearchPage } from './pages/CarRentalSearchPage';
+import { CheckoutPage } from './pages/CheckoutPage';
+import { generateBookerData, generateBillingData } from './helpers/dataGenerator';
 
-const booker = {
-    email: 'john.doe@example.com',
-    firstName: 'John',
-    lastName: 'Doe',
-    phone: '985689955',
-};
+test.describe.configure({ mode: 'serial' });
 
-test('Core car rental booking flow — search to checkout', async ({ page }) => {
+test.describe('Core car rental booking flow — search to checkout', () => {
+    let searchPage: CarRentalSearchPage;
+    let checkoutPage: CheckoutPage;
 
-    await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    const booker = generateBookerData();
+    const billing = generateBillingData();
+
+    test.beforeAll(async ({ browser }) => {
+        const page: Page = await browser.newPage();
+        await page.addInitScript(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        });
+        searchPage = new CarRentalSearchPage(page);
     });
 
-    await page.goto('https://www.booking.com/cars/index.en-gb.html');
-    await page.getByRole('combobox', { name: 'Pick-up location' }).pressSequentially('New York', { delay: 80 });
-    await page.getByRole('option', { name: 'John F. Kennedy International' }).click();
-    await page.getByRole('button', { name: 'Search' }).click();
-    await page.waitForLoadState('networkidle');
+    test('should search for cars at JFK Airport', async () => {
+        await searchPage.goto();
+        await searchPage.searchLocation('New York');
+        await searchPage.selectSuggestion('John F. Kennedy International');
+        await searchPage.clickSearch();
+    });
 
-    const closeSignInDialog = page.getByTestId('signin-modal-close');
-    if (await closeSignInDialog.isVisible()) {
-        await closeSignInDialog.click();
-    }
+    test('should open a car deal in a new tab', async () => {
+        await searchPage.closeSignInModalIfVisible();
+        const newPage = await searchPage.openFirstDeal();
+        checkoutPage = new CheckoutPage(newPage);
+        await expect(checkoutPage.extrasButton).toBeVisible();
+    });
 
-    const [newPage] = await Promise.all([
-        page.context().waitForEvent('page'),
-        page.getByRole('group').getByLabel('View deal').first().click(),
-    ]);
+    test('should proceed through extras to checkout', async () => {
+        await checkoutPage.proceedToExtras();
+        await checkoutPage.proceedToCheckout();
+        await expect(checkoutPage.emailField).toBeVisible();
+    });
 
-    await newPage.waitForLoadState('networkidle');
+    test('should fill in contact details', async () => {
+        await checkoutPage.fillContactDetails(booker);
+        await expect(checkoutPage.emailField).toHaveValue(booker.email);
+    });
 
-    await newPage.getByTestId('go-to-extras-button').click();
-    await newPage.waitForLoadState('networkidle');
+    test('should fill in booker personal details', async () => {
+        await checkoutPage.fillBookerDetails(booker);
+    });
 
-    await newPage.getByTestId('checkoutButton').click();
-    await newPage.waitForLoadState('networkidle');
+    test('should fill in billing address', async () => {
+        await checkoutPage.fillBillingAddress(billing);
+    });
 
-    // Fill contact details
-    await newPage.getByTestId('email-field').fill(booker.email);
-    await newPage.getByTestId('firstName-field').fill(booker.firstName);
-    await newPage.getByTestId('lastName-field').fill(booker.lastName);
-    await newPage.getByTestId('telephoneNumber-number-field').fill(booker.phone);
+    test('should select Google Pay and confirm it is available', async () => {
+        await checkoutPage.selectGooglePay();
+        await expect(checkoutPage.googlePayButton).toBeVisible();
+    });
 
-    // Fill booker personal details
-    await newPage.getByTestId('bookerDetailsFirstName-field').fill(booker.firstName);
-    await newPage.getByTestId('bookerDetailsLastName-field').fill(booker.lastName);
-    await newPage.getByTestId('bookerDetailsTelephoneNumber-number-field').fill(booker.phone);
-
-    // Fill billing address
-    await newPage.getByTestId('billingAddressAddress-field').fill('350 Fifth Avenue');
-    await newPage.getByTestId('billingAddressCity-field').fill('New York');
-    await newPage.getByTestId('billingAddressPostcode-field').fill('10118');
-
-    // Select Google Pay and verify it is available
-    const paymentFrame = newPage.locator('iframe[title="Payment"]').contentFrame();
-    await paymentFrame.getByTestId('GOOGLE_PAY_DI').first().click();
-    await expect(paymentFrame.getByRole('button', { name: 'Google Pay' })).toBeVisible();
-
-    // Verify Book Now button is enabled and click it
-    const bookNowButton = newPage.getByRole('button', { name: /book now/i });
-    await expect(bookNowButton).toBeEnabled();
+    test('should enable the Book Now button', async () => {
+        await expect(checkoutPage.bookNowButton).toBeEnabled();
+    });
 });

@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: 'html',
   timeout: 90000,
   use: {
+    baseURL: process.env.BASE_URL ?? 'https://www.booking.com',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     headless: true,
