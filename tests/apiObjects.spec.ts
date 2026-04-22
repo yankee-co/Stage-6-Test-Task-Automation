@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'https://api.restful-api.dev/objects';
+const HEADERS = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+
+test.describe.configure({ mode: 'serial' });
 
 test.describe('API /objects', () => {
 
     test('GET /objects — returns a non-empty array', async ({ request }) => {
-        const response = await request.get(BASE_URL);
+        const response = await request.get(BASE_URL, { headers: HEADERS });
 
         expect(response.status()).toBe(200);
 
@@ -26,7 +29,7 @@ test.describe('API /objects', () => {
         };
 
         // POST — create object
-        const createResponse = await request.post(BASE_URL, { data: payload });
+        const createResponse = await request.post(BASE_URL, { data: payload, headers: HEADERS });
         expect(createResponse.status()).toBe(200);
 
         const created = await createResponse.json();
@@ -37,7 +40,7 @@ test.describe('API /objects', () => {
         const id = created.id;
 
         // GET — verify created object exists
-        const getResponse = await request.get(`${BASE_URL}/${id}`);
+        const getResponse = await request.get(`${BASE_URL}/${id}`, { headers: HEADERS });
         expect(getResponse.status()).toBe(200);
 
         const fetched = await getResponse.json();
@@ -45,14 +48,14 @@ test.describe('API /objects', () => {
         expect(fetched.name).toBe(payload.name);
 
         // DELETE — remove object
-        const deleteResponse = await request.delete(`${BASE_URL}/${id}`);
+        const deleteResponse = await request.delete(`${BASE_URL}/${id}`, { headers: HEADERS });
         expect(deleteResponse.status()).toBe(200);
 
         const deleteBody = await deleteResponse.json();
         expect(deleteBody.message).toContain(id);
 
         // GET — verify object no longer exists
-        const getAfterDelete = await request.get(`${BASE_URL}/${id}`);
+        const getAfterDelete = await request.get(`${BASE_URL}/${id}`, { headers: HEADERS });
         expect(getAfterDelete.status()).toBe(404);
     });
 

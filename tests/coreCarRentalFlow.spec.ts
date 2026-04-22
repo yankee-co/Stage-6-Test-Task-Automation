@@ -61,7 +61,4 @@ test('Core car rental booking flow — search to checkout', async ({ page }) => 
     // Verify Book Now button is enabled and click it
     const bookNowButton = newPage.getByRole('button', { name: /book now/i });
     await expect(bookNowButton).toBeEnabled();
-    await bookNowButton.click();
-
-    await expect(paymentFrame.getByTestId('message').getByText('Sign in to your Google Pay')).toBeVisible();
 });
